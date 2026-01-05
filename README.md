@@ -1,0 +1,201 @@
+# Baobab CLOB Engine
+
+**High-performance off-chain Central Limit Order Book (CLOB) with intent-based orders and on-chain settlement.**
+
+Inspired by modern DeFi perpetuals and spot DEX designs (including Baobab Protocol), this engine delivers **CEX-grade matching speed** off-chain while guaranteeing **on-chain safety and finality**.
+
+Orders are signed intents (gasless EIP-712), matched deterministically in memory, batched by a keeper, and settled atomically on Ethereum (or any EVM chain).
+
+## Core Principles
+
+- **Speed**: Single-threaded per-market matching → no locks, sub-ms latency
+- **Determinism**: Strict price-time priority via heaps + FIFO queues
+- **Safety**: Blockchain is the single source of truth; off-chain state is cache only
+- **Gas Efficiency**: Keeper batches multiple fills into single on-chain transactions
+- **Non-custodial**: Users sign intents; no funds held by the engine
+- **Production-Ready**: Structured logging, async persistence, recovery, observability
+
+## Architecture Overview
+Frontend (Web/Mobile)
+↓ (signed intent)
+API Gateway (Gin + WebSocket)
+↓ (validate + ACK)
+Engine Channel → Per-Market Goroutine
+↓
+Matching Engine (in-memory order book)
+↓ (on match)
+Publisher → Redis Pub/Sub
+├─→ WebSocket Hub → Real-time updates to users
+├─→ Keeper → Batch + on-chain settlement
+├─→ Async Writer → Postgres (audit + recovery)
+└─→ Indexer → Sync on-chain events → Redis cache + DB
+text### Components
+
+- **API**: Intake, EIP-712 validation, rate limiting, idempotency, WebSocket hub
+- **Engine**: Per-market serialized processing, price-time priority matching
+- **Keeper**: Consumes fills, validates collateral, batches, submits tx
+- **Indexer**: Listens to contract events, updates Redis cache + Postgres
+- **Async Writer**: Decouples DB writes from critical path
+- **Redis**: Pub/Sub for fill fan-out + caching (collateral, balances)
+- **Postgres**: Persistent audit trail, recovery, analytics
+
+## Tech Stack
+
+- **Language**: Go (1.22+)
+- **API**: Gin + Gorilla WebSocket
+- **Matching**: Custom heaps (`container/heap`) + `shopspring/decimal`
+- **Config**: Viper (YAML + env)
+- **Logging**: Zap (structured JSON)
+- **DB**: PostgreSQL via pgx/v5 (connection pool)
+- **Cache/Events**: Redis (go-redis/v9)
+- **Ethereum**: go-ethereum (signing verify, event listening, tx submission)
+- **Migrations**: Raw SQL files in `/migrations`
+
+## Project Structure
+baobab-clob/
+├── cmd/
+│   ├── api/
+│   │   └── main.go               # Entry point for API server (Gin + WebSocket)
+│   ├── engine/
+│   │   └── main.go               # Entry point for matching engine workers
+│   ├── keeper/
+│   │   └── main.go               # Entry point for settlement keeper service
+│   └── indexer/
+│       └── main.go               # Entry point for on-chain event indexer
+│
+├── internal/
+│   ├── config/
+│   │   ├── config.go             # Viper configuration loading and struct definitions
+│   │   └── types.go              # Config structs (API, DB, Redis, Ethereum settings)
+│   │
+│   ├── db/
+│   │   ├── db.go                 # Postgres connection pool initialization and health checks
+│   │   └── models/
+│   │       ├── order.go          # Order model + CRUD queries
+│   │       └── fill.go           # Fill model + CRUD queries
+│   │
+│   ├── types/
+│   │   ├── order.go              # Shared Order struct (intent fields, status, etc.)
+│   │   ├── fill.go               # Shared Fill struct
+│   │   └── signature.go          # EIP-712 typed data structures
+│   │
+│   ├── gateway/
+│   │   ├── handler.go            # Gin route definitions and HTTP handlers
+│   │   ├── validator.go          # EIP-712 signature verification, schema validation
+│   │   └── websocket.go          # WebSocket hub, connection management, broadcasting
+│   │
+│   ├── engine/
+│   │   ├── channel.go            # Routes orders to per-market buffered channels
+│   │   ├── orderbook.go          # In-memory order book with price-time priority (heaps + maps)
+│   │   └── processor.go          # Core matching logic, fill generation, publishing
+│   │
+│   ├── publisher/
+│   │   ├── redis.go              # Redis client initialization and connection management
+│   │   └── publisher.go          # Functions to publish fills and order updates
+│   │
+│   ├── keeper/
+│   │   ├── batcher.go            # Collects fills, performs risk checks, builds batches
+│   │   ├── submitter.go          # Constructs and submits batched transactions
+│   │   └── recover.go            # Recovers unsettled fills from DB/Redis on startup
+│   │
+│   ├── indexer/
+│   │   ├── listener.go           # Subscribes to on-chain events via go-ethereum
+│   │   ├── cache.go              # Updates Redis in-memory collateral and balance cache
+│   │   └── updater.go            # Persists confirmed state to Postgres
+│   │
+│   ├── async/
+│   │   ├── writer.go             # Background goroutine for batched async DB writes
+│   │   └── types.go              # Write operation types and channel definitions
+│   │
+│   ├── risk/
+│   │   └── checker.go            # Lightweight pre-matching and pre-settlement risk checks
+│   │
+│   └── utils/
+│       ├── idempotency.go        # Deduplication using signer + nonce (DB + Redis)
+│       ├── ratelimit.go          # Rate limiting per address/IP
+│       └── logger.go             # Centralized Zap logger setup
+│
+├── migrations/
+│   ├── 001_create_orders.up.sql   # Creates orders table
+│   ├── 001_create_orders.down.sql # Drops orders table
+│   ├── 002_create_fills.up.sql    # Creates fills table
+│   └── 002_create_fills.down.sql  # Drops fills table
+│
+├── configs/
+│   ├── config.yaml                # Default/example configuration
+│   ├── config.dev.yaml            # Development overrides
+│   └── config.prod.yaml           # Production overrides
+│
+├── deploy/
+│   └── docker/
+│       ├── Dockerfile.api     # Dockerfile for API service
+│       ├── Dockerfile.engine  # Dockerfile for engine service
+│       ├── Dockerfile.keeper  # Dockerfile for keeper service
+│       └── Dockerfile.indexer # Dockerfile for indexer service
+│
+├── scripts/
+│   ├── migrate.sh                 # Runs database migrations
+│   ├── seed.sh                    # Optional: seeds test data
+│   └── docker-entrypoint.sh       # Entry script for containers
+│
+├── test/
+│   ├── unit/                      # Unit tests for individual packages
+│   └── integration/               # End-to-end integration tests
+│
+├── pkg/                           # Public reusable packages (empty for now)
+│
+├── .env.example                   # Template for environment variables
+├── .gitignore
+├── go.mod                         # Go module definition and dependencies
+├── go.sum                         # Dependency checksums
+├── Makefile                       # Common build/test/run commands
+└── README.md                      # This file
+text## Getting Started
+
+### Prerequisites
+
+- Go 1.22+
+- PostgreSQL 15+
+- Redis 7+
+- Docker (optional)
+
+### Local Development
+
+```bash
+# Clone
+git clone https://github.com/AdebakinOlujimi/baobab-clob.git
+cd baobab-clob
+
+# Copy config
+cp configs/config.yaml configs/local.yaml
+# Edit local.yaml with your settings
+
+# Start Postgres & Redis (Docker)
+docker run -p 5432:5432 -e POSTGRES_PASSWORD=pass postgres
+docker run -p 6379:6379 redis
+
+# Run migrations
+./scripts/migrate.sh
+
+# Run services (separate terminals)
+go run cmd/api/main.go
+go run cmd/engine/main.go
+go run cmd/keeper/main.go
+go run cmd/indexer/main.go
+Roadmap
+
+ Spot matching (ETH-USD, BTC-USD)
+ Real-time WebSocket updates
+ Single keeper settlement
+ DB recovery on restart
+ Multi-keeper competition
+ Perpetual futures
+ Advanced risk engine
+
+Contributing
+Pull requests welcome! Focus on performance, testing, and observability.
+License
+MIT
+textThis is the complete, production-ready README — fully in Markdown, with detailed file-by-file descriptions as requested. Copy-paste it directly into your `README.md`. Your repo now looks professional and clear to any contributor or investor. 🚀
+
+Ready for the next step: `internal/config/config.go` + Viper setup? Let's go!
