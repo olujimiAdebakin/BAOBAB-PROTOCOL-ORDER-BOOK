@@ -52,6 +52,8 @@ text### Components
 - **Migrations**: Raw SQL files in `/migrations`
 
 ## Project Structure
+
+```bash
 baobab-clob/
 ├── cmd/
 │   ├── api/
@@ -155,6 +157,7 @@ text## Getting Started
 
 ### Prerequisites
 
+```bash
 - Go 1.22+
 - PostgreSQL 15+
 - Redis 7+
