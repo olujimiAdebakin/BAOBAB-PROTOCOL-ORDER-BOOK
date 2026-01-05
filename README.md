@@ -149,7 +149,8 @@ baobab-clob/
 ├── go.mod                         # Go module definition and dependencies
 ├── go.sum                         # Dependency checksums
 ├── Makefile                       # Common build/test/run commands
-└── README.md                      # This file
+└── README.md                      # Project documentation
+
 text## Getting Started
 
 ### Prerequisites
