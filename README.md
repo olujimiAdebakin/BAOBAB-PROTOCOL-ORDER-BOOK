@@ -154,15 +154,15 @@ baobab-clob/
 └── README.md                      # Project documentation
 
 text## Getting Started
+```
 
 ### Prerequisites
-
 ```bash
 - Go 1.22+
 - PostgreSQL 15+
 - Redis 7+
 - Docker (optional)
-
+```
 ### Local Development
 
 ```bash
