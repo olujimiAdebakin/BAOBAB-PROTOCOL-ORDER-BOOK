@@ -153,6 +153,167 @@ baobab-clob/
 ├── Makefile                       # Common build/test/run commands
 └── README.md                      # Project documentation
 
+baobab-clob/
+│
+├── cmd/                              # Entry points (binaries)
+│   ├── api/main.go                   # API Gateway service
+│   ├── engine/main.go                # Matching Engine service
+│   ├── keeper/main.go                # Settlement Keeper service
+│   └── indexer/main.go               # Event Indexer service
+│
+├── internal/                         # Private application code
+│   │
+│   ├── config/                       # Configuration management
+│   │   ├── config.go                 # Viper setup, config loader
+│   │   └── types.go                  # Config structs (API, DB, Redis, Ethereum)
+│   │
+│   ├── types/                        # Shared domain types
+│   │   ├── order.go                  # Order struct, validation
+│   │   ├── fill.go                   # Fill struct
+│   │   ├── market.go                 # Market definitions
+│   │   └── signature.go              # EIP-712 typed data structures
+│   │
+│   ├── gateway/                      # API Gateway layer
+│   │   ├── server.go                 # HTTP server setup
+│   │   ├── routes.go                 # Route definitions
+│   │   ├── handler.go                # Request handlers
+│   │   ├── validator.go              # EIP-712 signature verification
+│   │   ├── websocket.go              # WebSocket hub, connection pool
+│   │   └── middleware/
+│   │       ├── auth.go               # Authentication
+│   │       ├── ratelimit.go          # Rate limiting
+│   │       ├── idempotency.go        # Duplicate request prevention
+│   │       └── logger.go             # Request logging
+│   │
+│   ├── engine/                       # Matching Engine
+│   │   ├── channel.go                # Market-specific routing
+│   │   ├── market/
+│   │   │   ├── market.go             # Market engine lifecycle
+│   │   │   ├── orderbook.go          # In-memory order book
+│   │   │   ├── heap.go               # Price-time priority heaps
+│   │   │   ├── matcher.go            # Matching algorithm
+│   │   │   ├── processor.go          # Order processing logic
+│   │   │   └── snapshot.go           # State snapshots for recovery
+│   │   └── models/
+│   │       ├── order.go              # Internal order representation
+│   │       └── trade.go              # Trade result
+│   │
+│   ├── publisher/                    # Event publishing
+│   │   ├── redis.go                  # Redis client setup
+│   │   └── publisher.go              # Publish fills, updates
+│   │
+│   ├── keeper/                       # Settlement Keeper
+│   │   ├── keeper.go                 # Keeper lifecycle
+│   │   ├── subscriber.go             # Redis subscription
+│   │   ├── batcher.go                # Batch construction
+│   │   ├── validator.go              # Pre-settlement validation
+│   │   ├── submitter.go              # Transaction submission
+│   │   └── recover.go                # Recovery on restart
+│   │
+│   ├── indexer/                      # Event Indexer
+│   │   ├── indexer.go                # Indexer lifecycle
+│   │   ├── listener.go               # Event subscription
+│   │   ├── handlers/
+│   │   │   ├── deposit.go            # Deposit event handler
+│   │   │   ├── fill.go               # Fill event handler
+│   │   │   └── withdrawal.go         # Withdrawal event handler
+│   │   ├── cache.go                  # Redis cache updates
+│   │   ├── updater.go                # Postgres updates
+│   │   └── reorg.go                  # Reorg detection & handling
+│   │
+│   ├── storage/                      # Data persistence
+│   │   ├── postgres/
+│   │   │   ├── client.go             # Connection pool
+│   │   │   ├── orders.go             # Order CRUD
+│   │   │   ├── fills.go              # Fill CRUD
+│   │   │   ├── balances.go           # Balance snapshots
+│   │   │   └── health.go             # Health checks
+│   │   └── redis/
+│   │       ├── client.go             # Redis connection
+│   │       ├── cache.go              # Collateral cache
+│   │       ├── pubsub.go             # Pub/Sub helpers
+│   │       └── locks.go              # Distributed locks
+│   │
+│   ├── async/                        # Async processing
+│   │   ├── writer.go                 # Background DB writer
+│   │   ├── batcher.go                # Write batching
+│   │   └── queue.go                  # Write queue management
+│   │
+│   ├── risk/                         # Risk management
+│   │   ├── checker.go                # Risk checks
+│   │   ├── limits.go                 # Position limits
+│   │   └── collateral.go             # Collateral validation
+│   │
+│   ├── eth/                          # Ethereum interaction
+│   │   ├── client.go                 # Ethereum client wrapper
+│   │   ├── signer.go                 # EIP-712 signing/verification
+│   │   └── contracts/
+│   │       └── settlement.go         # Generated contract bindings
+│   │
+│   └── utils/                        # Utilities
+│       ├── logger.go                 # Structured logging setup
+│       ├── metrics.go                # Prometheus metrics
+│       ├── health.go                 # Health check utilities
+│       └── recovery.go               # Panic recovery
+│
+├── migrations/                       # Database migrations
+│   ├── 001_create_orders.up.sql
+│   ├── 001_create_orders.down.sql
+│   ├── 002_create_fills.up.sql
+│   ├── 002_create_fills.down.sql
+│   ├── 003_create_balances.up.sql
+│   └── 003_create_balances.down.sql
+│
+├── configs/                          # Configuration files
+│   ├── config.yaml                   # Base configuration
+│   ├── config.dev.yaml               # Development overrides
+│   ├── config.staging.yaml           # Staging overrides
+│   └── config.prod.yaml              # Production configuration
+│
+├── deploy/                           # Deployment configurations
+│   ├── docker/
+│   │   ├── Dockerfile.api
+│   │   ├── Dockerfile.engine
+│   │   ├── Dockerfile.keeper
+│   │   └── Dockerfile.indexer
+│   └── kubernetes/
+│       ├── api-deployment.yaml
+│       ├── engine-deployment.yaml
+│       ├── keeper-deployment.yaml
+│       ├── indexer-deployment.yaml
+│       └── services.yaml
+│
+├── scripts/                          # Utility scripts
+│   ├── migrate.sh                    # Run migrations
+│   ├── seed.sh                       # Seed test data
+│   ├── docker-entrypoint.sh          # Container entry point
+│   └── benchmark.sh                  # Run benchmarks
+│
+├── test/                             # Tests
+│   ├── unit/                         # Unit tests
+│   │   ├── orderbook_test.go
+│   │   ├── matcher_test.go
+│   │   └── validator_test.go
+│   ├── integration/                  # Integration tests
+│   │   ├── api_test.go
+│   │   └── settlement_test.go
+│   └── load/                         # Load tests
+│       └── locustfile.py
+│
+├── docs/                             # Documentation
+│   ├── architecture.md               # System architecture
+│   ├── api.md                        # API documentation
+│   ├── deployment.md                 # Deployment guide
+│   └── performance.md                # Performance tuning
+│
+├── .env.example                      # Environment variable template
+├── .gitignore
+├── go.mod                            # Go module definition
+├── go.sum                            # Dependency checksums
+├── Makefile                          # Build automation
+├── docker-compose.yaml               # Local development stack
+└── README.md                         # This file
+
 text## Getting Started
 ```
 
